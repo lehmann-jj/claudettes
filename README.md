@@ -59,6 +59,8 @@ In Chrome's menu tap **Install app** (or *Add to Home screen*). Fixie then gets 
 | `README.md` | This file | founder |
 
 ## Screenshots / demo
+**Pitch deck:** [`pitch/fixie-pitch-deck.html`](pitch/fixie-pitch-deck.html) (download and open in a browser).
+
 <Add a screenshot and the 2-minute demo video link here.>
 
 ## Team
