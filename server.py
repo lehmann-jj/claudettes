@@ -4,7 +4,6 @@ asks Claude, and returns what the helper should say back.
 Run:  .venv/bin/uvicorn server:app --reload --port 8000
 """
 import os
-import re
 import uuid
 from pathlib import Path
 
@@ -27,17 +26,6 @@ app = FastAPI()
 # Conversation history per call, kept server-side and append-only
 # (we never edit earlier turns, so thinking blocks stay valid).
 SESSIONS: dict[str, list] = {}
-
-# Claude can mark a spot in the latest camera frame: [[point x=520 y=310 label="power button"]]
-POINT_RE = re.compile(r'\[\[point\s+x=(\d+)\s+y=(\d+)(?:\s+label="([^"]*)")?\s*\]\]')
-
-
-def extract_point(reply: str) -> tuple[str, dict | None]:
-    m = POINT_RE.search(reply)
-    if not m:
-        return reply, None
-    x, y = min(int(m[1]), 1000) / 1000, min(int(m[2]), 1000) / 1000
-    return POINT_RE.sub("", reply).strip(), {"x": x, "y": y, "label": m[3] or ""}
 
 
 class Turn(BaseModel):
@@ -89,9 +77,8 @@ def turn(t: Turn):
         reply = "Hmm, I can't help with that one. Shall we try something else?"
     else:
         reply = " ".join(b.text for b in resp.content if b.type == "text").strip()
-    reply, point = extract_point(reply)
     searched = any(b.type == "server_tool_use" for b in resp.content)
-    return {"session_id": sid, "reply": reply or "Mm-hm, go on.", "point": point, "searched": searched}
+    return {"session_id": sid, "reply": reply or "Mm-hm, go on.", "searched": searched}
 
 
 @app.post("/api/hangup")

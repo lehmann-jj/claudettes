@@ -57,12 +57,3 @@ button.off { background: #fff; color: #111; }
 
 #camWarn { position: absolute; top: 3.5rem; left: 1rem; right: 10rem; padding: .6rem 1rem; border-radius: 12px;
   background: rgba(245,158,11,.9); color: #111; font-size: 1.05rem; }
-
-/* Ring Fixie draws on the live video to point at something */
-#marker { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 5; }
-#marker .ring { position: absolute; left: -45px; top: -45px; width: 90px; height: 90px; border-radius: 50%;
-  border: 5px solid #facc15; box-shadow: 0 0 0 3px rgba(0,0,0,.5), 0 0 24px #facc15; animation: ring 1.2s infinite; }
-#marker .label { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); white-space: nowrap;
-  padding: .3rem .7rem; border-radius: 8px; background: #facc15; color: #111; font-weight: 700; font-size: 1.1rem; }
-#marker .label:empty { display: none; }
-@keyframes ring { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
