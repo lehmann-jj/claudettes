@@ -32,6 +32,7 @@ const FRAMES_SENT = 3;
 let recentFrames = [];
 const WARMUP_MS = 1500; // camera needs ~1s to settle exposure after it opens
 let cameraReadyAt = 0;
+let darkFrames = 0; // consecutive black frames, to warn the caller
 
 // ---------- UI helpers ----------
 function setState(s, label) {
@@ -46,15 +47,38 @@ setInterval(() => {
 }, 1000);
 
 // ---------- Camera ----------
+const IR_CAMERA = /\bIR\b|infrared/i; // laptop face-login cameras: black except when the IR light flashes
+
+async function openStream(video) {
+  return navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, ...video }, audio: false });
+}
+
 async function startCamera() {
   if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-    audio: false,
-  });
+  stream = await openStream({ facingMode: facing });
+  let track = stream.getVideoTracks()[0];
+  if (IR_CAMERA.test(track.label)) {
+    // Labels are only visible after permission is granted, so check now and switch to a normal camera.
+    const cams = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === "videoinput" && !IR_CAMERA.test(d.label));
+    if (cams.length) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = await openStream({ deviceId: { exact: cams[0].deviceId } });
+      track = stream.getVideoTracks()[0];
+    }
+  }
+  showStream();
+}
+
+// Put the (new) stream on screen and reset the frame buffer.
+function showStream() {
+  const track = stream.getVideoTracks()[0];
+  console.log("Camera:", track.label, track.getSettings());
+  facing = track.getSettings().facingMode === "user" ? "user" : "environment";
   $("cam").srcObject = stream;
   // Fresh stream: drop frames from the old camera and ignore the dark warm-up frames.
   recentFrames = [];
+  darkFrames = 0;
   cameraReadyAt = Date.now() + WARMUP_MS;
   $("cam").style.transform = facing === "user" ? "scaleX(-1)" : "";
 }
@@ -63,7 +87,20 @@ setInterval(() => {
   if (!callStart) return;
   const f = grabFrame(768);
   if (f) recentFrames = [...recentFrames, f].slice(-FRAMES_SENT);
+  $("camWarn").hidden = darkFrames < 3;
 }, FRAME_EVERY_MS);
+
+// Average brightness 0-255 of the frame on the canvas, from a tiny thumbnail.
+function brightness(canvas) {
+  const t = $("thumb");
+  t.width = t.height = 16;
+  const ctx = t.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(canvas, 0, 0, 16, 16);
+  const d = ctx.getImageData(0, 0, 16, 16).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+  return sum / (d.length / 4) / 3;
+}
 
 function grabFrame(maxSide = 1024) {
   const v = $("cam");
@@ -73,6 +110,9 @@ function grabFrame(maxSide = 1024) {
   c.width = Math.round(v.videoWidth * scale);
   c.height = Math.round(v.videoHeight * scale);
   c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  // Never send black frames to Claude: it would just say "I can't see anything".
+  if (brightness(c) < 12) { darkFrames++; return null; }
+  darkFrames = 0;
   return c.toDataURL("image/jpeg", 0.75).split(",")[1];
 }
 
@@ -218,8 +258,16 @@ $("micBtn").onclick = () => {
 };
 
 $("flipBtn").onclick = async () => {
-  facing = facing === "environment" ? "user" : "environment";
-  try { await startCamera(); } catch (_) {}
+  // Step through every camera (phone front/back, or laptop webcam/IR/USB).
+  const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+  const current = stream?.getVideoTracks()[0]?.getSettings().deviceId;
+  const next = cams[(cams.findIndex((c) => c.deviceId === current) + 1) % cams.length];
+  if (!next) return;
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  try {
+    stream = await openStream({ deviceId: { exact: next.deviceId } });
+  } catch (_) { return startCamera(); }
+  showStream();
 };
 
 $("hangBtn").onclick = async () => {

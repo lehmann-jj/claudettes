@@ -54,3 +54,6 @@ button.off { background: #fff; color: #111; }
 .controls { position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem 1rem 1.5rem;
   display: flex; justify-content: center; gap: 1.2rem;
   background: linear-gradient(transparent, rgba(0,0,0,.7)); }
+
+#camWarn { position: absolute; top: 3.5rem; left: 1rem; right: 10rem; padding: .6rem 1rem; border-radius: 12px;
+  background: rgba(245,158,11,.9); color: #111; font-size: 1.05rem; }
