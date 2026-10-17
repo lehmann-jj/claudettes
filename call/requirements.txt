@@ -1,0 +1,2 @@
+livekit-agents[anthropic,silero]~=1.8
+python-dotenv
