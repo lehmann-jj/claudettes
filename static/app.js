@@ -30,6 +30,8 @@ let wakeLock = null;
 const FRAME_EVERY_MS = 1000;
 const FRAMES_SENT = 3;
 let recentFrames = [];
+const WARMUP_MS = 1500; // camera needs ~1s to settle exposure after it opens
+let cameraReadyAt = 0;
 
 // ---------- UI helpers ----------
 function setState(s, label) {
@@ -51,6 +53,9 @@ async function startCamera() {
     audio: false,
   });
   $("cam").srcObject = stream;
+  // Fresh stream: drop frames from the old camera and ignore the dark warm-up frames.
+  recentFrames = [];
+  cameraReadyAt = Date.now() + WARMUP_MS;
   $("cam").style.transform = facing === "user" ? "scaleX(-1)" : "";
 }
 
@@ -62,7 +67,7 @@ setInterval(() => {
 
 function grabFrame(maxSide = 1024) {
   const v = $("cam");
-  if (!v.videoWidth) return null;
+  if (!v.videoWidth || Date.now() < cameraReadyAt) return null;
   const scale = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
   const c = $("grab");
   c.width = Math.round(v.videoWidth * scale);
