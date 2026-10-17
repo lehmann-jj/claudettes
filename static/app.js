@@ -233,7 +233,12 @@ $("callBtn").onclick = async () => {
   try {
     await startCamera();
   } catch (err) {
-    alert("I couldn't open the camera. Please allow camera access and try again.\n\n" + err.message);
+    const why = {
+      NotAllowedError: "Camera access was blocked. Please allow the camera (click the camera icon in the address bar) and try again.",
+      NotFoundError: "I can't find a camera on this device. Is one plugged in? Try another device, like your phone.",
+      NotReadableError: "The camera is busy or not responding. Close other apps that use the camera, or restart the device.",
+    }[err.name] || "I couldn't open the camera.";
+    alert(`${why}\n\n(${err.name}: ${err.message})`);
     return;
   }
   $("lobby").hidden = true;
