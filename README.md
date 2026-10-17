@@ -64,11 +64,11 @@ In Chrome's menu tap **Install app** (or *Add to Home screen*). Fixie then gets 
 ## Team
 | Name | Role / background |
 |---|---|
-| [Your name](https://github.com/your-username) | Builder |
-| [Your name](https://github.com/your-username) | Product / design |
-| [Your name](https://github.com/your-username) | Domain expert |
-| [Your name](https://github.com/your-username) | Founder |
-| [Your name](https://github.com/your-username) *(optional)* | |
+| [Yuliia Ivanova](https://github.com/yuliiaivanova) | Domain expert |
+| [Mariel Breuer](https://github.com/marielbreuer) | Product / design |
+| [Danial Darabi](https://github.com/drdanial97) | Builder |
+| [Eva-Valérie Gfrerer](https://de.linkedin.com/in/eva-gfrerer) | Founder |
+| [JJ Lehmann](https://github.com/lehmann-jj) | Builder |
 
 ## Credits
 - [Anthropic Claude API](https://docs.claude.com) (vision + web search)
