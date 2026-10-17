@@ -21,7 +21,14 @@ let facing = "environment";
 let recog = null;
 let state = "idle"; // idle | listening | thinking | speaking
 let muted = false;
-let buffer = "";
+let buffer = "";        // what the caller said in earlier recognition sessions of this turn
+let sessionText = "";   // what the current recognition session heard so far
+const CAPTION_MAX = 100; // characters of the caller's words shown on screen
+const heard = () => `${buffer} ${sessionText}`.trim();
+
+function showCaption(id, text) {
+  $(id).textContent = text;
+}
 let silenceTimer = null;
 let firstTurn = true;
 let callStart = 0;
@@ -116,30 +123,124 @@ function grabFrame(maxSide = 1024) {
   return c.toDataURL("image/jpeg", 0.75).split(",")[1];
 }
 
-// ---------- Pointing: ring on the live video ----------
+// ---------- Pointing: ring on the live video, tracked as the camera moves ----------
+// Claude marks a spot (x, y in 0..1) in the frame we sent. We cut a small patch around that spot
+// from the sent frame, then keep finding the same patch in the live video and move the ring there.
+const TRACK_W = 160;          // tracking works on a small grayscale copy of the video
+const PATCH = 10;             // patch half-size in tracking pixels (21x21 patch)
+const SEARCH = 12;            // how far the patch may move between two tracking steps
+const LOST_SCORE = 28;        // mean pixel difference above this = we lost it
 let markerTimer = null;
+let sentGray = null;          // grayscale copy of the frame Claude saw: { data, w, h }
+let track = null;             // { patch, x, y, lost } in tracking pixels
+
+function grayOf(source, w, h) {
+  const t = $("track");
+  t.width = w; t.height = h;
+  const ctx = t.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(source, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < g.length; i++) g[i] = 0.3 * d[i * 4] + 0.59 * d[i * 4 + 1] + 0.11 * d[i * 4 + 2];
+  return { data: g, w, h };
+}
+
+function trackSize() {
+  const v = $("cam");
+  return [TRACK_W, Math.round((TRACK_W * v.videoHeight) / v.videoWidth)];
+}
+
+// Remember the frame we're sending to Claude, so the marker can be matched against it later.
+function rememberSentFrame() {
+  const v = $("cam");
+  if (v.videoWidth) sentGray = grayOf(v, ...trackSize());
+}
+
+function cutPatch(img, cx, cy) {
+  const n = 2 * PATCH + 1, p = new Float32Array(n * n);
+  let sum = 0;
+  for (let dy = -PATCH; dy <= PATCH; dy++)
+    for (let dx = -PATCH; dx <= PATCH; dx++) {
+      const x = Math.min(img.w - 1, Math.max(0, cx + dx)), y = Math.min(img.h - 1, Math.max(0, cy + dy));
+      const val = img.data[y * img.w + x];
+      p[(dy + PATCH) * n + dx + PATCH] = val; sum += val;
+    }
+  const mean = sum / p.length;
+  for (let i = 0; i < p.length; i++) p[i] -= mean; // brightness-independent
+  return p;
+}
+
+// Best place for the patch in img within the box around (cx, cy). Returns [x, y, score].
+function findPatch(img, patch, cx, cy, radius) {
+  let best = [cx, cy, Infinity, Infinity];
+  const step = radius > 20 ? 2 : 1;
+  for (let y = Math.max(PATCH, cy - radius); y <= Math.min(img.h - 1 - PATCH, cy + radius); y += step)
+    for (let x = Math.max(PATCH, cx - radius); x <= Math.min(img.w - 1 - PATCH, cx + radius); x += step) {
+      const c = cutPatch(img, x, y);
+      let diff = 0;
+      for (let i = 0; i < c.length; i++) diff += Math.abs(c[i] - patch[i]);
+      diff /= c.length;
+      // Prefer matches near the last known spot (look-alike buttons further away lose).
+      const cost = diff + 0.15 * Math.hypot(x - cx, y - cy);
+      if (cost < best[3]) best = [x, y, diff, cost];
+    }
+  // Coarse search skipped every other pixel: refine around the best spot.
+  return step > 1 ? findPatch(img, patch, best[0], best[1], 2) : best;
+}
 
 // x, y are 0..1 in the camera frame. The video is shown with object-fit: cover (cropped), maybe mirrored.
-function showMarker(point) {
+function placeMarker(nx, ny) {
   const v = $("cam"), m = $("marker");
-  if (!point || !v.videoWidth) return hideMarker();
   const box = v.getBoundingClientRect();
   const scale = Math.max(box.width / v.videoWidth, box.height / v.videoHeight);
   const offX = (box.width - v.videoWidth * scale) / 2;
   const offY = (box.height - v.videoHeight * scale) / 2;
-  const x = facing === "user" ? 1 - point.x : point.x;
+  const x = facing === "user" ? 1 - nx : nx;
   m.style.left = `${offX + x * v.videoWidth * scale}px`;
-  m.style.top = `${offY + point.y * v.videoHeight * scale}px`;
+  m.style.top = `${offY + ny * v.videoHeight * scale}px`;
+}
+
+function showMarker(point) {
+  const v = $("cam"), m = $("marker");
+  if (!point || !v.videoWidth) return hideMarker();
   m.querySelector(".label").textContent = point.label || "";
   m.hidden = false;
+  m.style.opacity = 1;
+  placeMarker(point.x, point.y);
+  if (sentGray) {
+    const px = Math.round(point.x * sentGray.w), py = Math.round(point.y * sentGray.h);
+    track = { patch: cutPatch(sentGray, px, py), x: px, y: py, lost: 0 };
+    // The camera may have moved while Claude was thinking: search a wide area once.
+    const [x, y] = findPatch(grayOf(v, sentGray.w, sentGray.h), track.patch, px, py, 50);
+    track.x = x; track.y = y;
+  }
   clearTimeout(markerTimer);
-  markerTimer = setTimeout(hideMarker, 12000);
+  markerTimer = setTimeout(hideMarker, 15000);
 }
 
 function hideMarker() {
   clearTimeout(markerTimer);
+  track = null;
   $("marker").hidden = true;
 }
+
+setInterval(() => {
+  if (!track || !sentGray) return;
+  const img = grayOf($("cam"), sentGray.w, sentGray.h);
+  const [x, y, score] = findPatch(img, track.patch, track.x, track.y, SEARCH);
+  const m = $("marker");
+  if (score > LOST_SCORE) {
+    // Can't see it right now: fade out, and look a bit wider next time.
+    track.lost++;
+    m.style.opacity = track.lost > 3 ? 0 : 0.4;
+    if (track.lost > 3) { const [wx, wy, ws] = findPatch(img, track.patch, track.x, track.y, 40); if (ws <= LOST_SCORE) { track.x = wx; track.y = wy; } }
+    return;
+  }
+  track.lost = 0;
+  track.x = x; track.y = y;
+  m.style.opacity = 1;
+  placeMarker(x / img.w, y / img.h);
+}, 66);
 
 // ---------- Text to speech ----------
 function pickVoice() {
@@ -157,6 +258,16 @@ function speak(text) {
     u.onend = u.onerror = resolve;
     speechSynthesis.speak(u);
   });
+}
+
+// Speak sentence by sentence, showing only the current sentence as the subtitle.
+async function speakWithSubtitles(text) {
+  const sentences = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
+  for (const sentence of sentences) {
+    if (!sentence.trim()) continue;
+    showCaption("fixieSaid", sentence.trim());
+    await speak(sentence.trim());
+  }
 }
 
 // ---------- Speech to text ----------
@@ -182,21 +293,32 @@ function setupRecognition() {
   recog.interimResults = true;
 
   recog.onresult = (e) => {
-    let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (r.isFinal) buffer += r[0].transcript + " ";
-      else interim += r[0].transcript;
+    // Rebuild this session's text from all results. Android Chrome repeats earlier words inside
+    // later results ("my", "my printer", "my printer is"), so keep only the longest version.
+    const parts = [];
+    for (let i = 0; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.trim();
+      const last = parts[parts.length - 1];
+      if (!t) continue;
+      if (last && t.toLowerCase().startsWith(last.toLowerCase())) parts[parts.length - 1] = t;
+      else if (last && last.toLowerCase().startsWith(t.toLowerCase())) continue;
+      else parts.push(t);
     }
-    $("youSaid").textContent = (buffer + interim).trim();
+    sessionText = parts.join(" ");
+    const text = heard();
+    showCaption("youSaid", text.length > CAPTION_MAX ? "…" + text.slice(-CAPTION_MAX) : text);
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => {
-      const text = (buffer + interim).trim();
+      const text = heard();
       if (text) sendTurn(text);
     }, SILENCE_MS);
   };
-  // Chrome stops recognition after a while; restart while we're supposed to be listening.
-  recog.onend = () => { if (state === "listening" && !muted) try { recog.start(); } catch (_) {} };
+  // Chrome stops recognition after a while; keep what was heard and restart while we're listening.
+  recog.onend = () => {
+    buffer = heard();
+    sessionText = "";
+    if (state === "listening" && !muted) try { recog.start(); } catch (_) {}
+  };
   recog.onerror = (e) => { if (e.error === "not-allowed") $("state").textContent = "mic blocked"; };
 }
 
@@ -204,12 +326,14 @@ function setupRecognition() {
 async function sendTurn(text) {
   clearTimeout(silenceTimer);
   buffer = "";
+  sessionText = "";
   stopListening();
   setState("thinking");
-  $("youSaid").textContent = text;
+  showCaption("youSaid", text.length > CAPTION_MAX ? "…" + text.slice(-CAPTION_MAX) : text);
 
   // Recent motion from the stream + a sharp frame right now.
   const now = grabFrame();
+  rememberSentFrame();
   const images = [...recentFrames.slice(-(FRAMES_SENT - 1)), now].filter(Boolean);
   let payloadText = text;
   if (firstTurn) {
@@ -244,10 +368,9 @@ async function sendTurn(text) {
   clearTimeout(fillerTimer);
   if (fillerSpoken) await fillerSpoken;
 
-  $("fixieSaid").textContent = reply;
   showMarker(point);
   setState("speaking");
-  await speak(reply);
+  await speakWithSubtitles(reply);
   setState("idle");
   $("youSaid").textContent = "";
   startListening();
@@ -276,9 +399,8 @@ $("callBtn").onclick = async () => {
   try { wakeLock = await navigator.wakeLock?.request("screen"); } catch (_) {}
   setupRecognition();
 
-  $("fixieSaid").textContent = GREETING[lang];
   setState("speaking");
-  await speak(GREETING[lang]);
+  await speakWithSubtitles(GREETING[lang]);
   setState("idle");
   startListening();
 };

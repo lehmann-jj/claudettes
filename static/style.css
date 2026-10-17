@@ -44,7 +44,9 @@ button.off { background: #fff; color: #111; }
   flex-direction: column; gap: .5rem; align-items: center; }
 #captions div:empty { display: none; }
 #youSaid, #fixieSaid { max-width: 40rem; padding: .6rem 1rem; border-radius: 12px;
-  background: rgba(0,0,0,.65); font-size: 1.25rem; line-height: 1.4; }
+  background: rgba(0,0,0,.65); font-size: 1.25rem; line-height: 1.4;
+  /* never more than 3 lines, so the video stays visible */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 #youSaid { color: #bbb; font-style: italic; }
 
 #typeForm { position: absolute; left: 1rem; right: 1rem; bottom: 6.2rem; display: flex; justify-content: center; }
@@ -59,7 +61,8 @@ button.off { background: #fff; color: #111; }
   background: rgba(245,158,11,.9); color: #111; font-size: 1.05rem; }
 
 /* Ring Fixie draws on the live video to point at something */
-#marker { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 5; }
+#marker { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 5;
+  transition: left .08s linear, top .08s linear, opacity .3s; }
 #marker .ring { position: absolute; left: -45px; top: -45px; width: 90px; height: 90px; border-radius: 50%;
   border: 5px solid #facc15; box-shadow: 0 0 0 3px rgba(0,0,0,.5), 0 0 24px #facc15; animation: ring 1.2s infinite; }
 #marker .label { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); white-space: nowrap;
