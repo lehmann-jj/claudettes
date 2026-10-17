@@ -116,6 +116,31 @@ function grabFrame(maxSide = 1024) {
   return c.toDataURL("image/jpeg", 0.75).split(",")[1];
 }
 
+// ---------- Pointing: ring on the live video ----------
+let markerTimer = null;
+
+// x, y are 0..1 in the camera frame. The video is shown with object-fit: cover (cropped), maybe mirrored.
+function showMarker(point) {
+  const v = $("cam"), m = $("marker");
+  if (!point || !v.videoWidth) return hideMarker();
+  const box = v.getBoundingClientRect();
+  const scale = Math.max(box.width / v.videoWidth, box.height / v.videoHeight);
+  const offX = (box.width - v.videoWidth * scale) / 2;
+  const offY = (box.height - v.videoHeight * scale) / 2;
+  const x = facing === "user" ? 1 - point.x : point.x;
+  m.style.left = `${offX + x * v.videoWidth * scale}px`;
+  m.style.top = `${offY + point.y * v.videoHeight * scale}px`;
+  m.querySelector(".label").textContent = point.label || "";
+  m.hidden = false;
+  clearTimeout(markerTimer);
+  markerTimer = setTimeout(hideMarker, 12000);
+}
+
+function hideMarker() {
+  clearTimeout(markerTimer);
+  $("marker").hidden = true;
+}
+
 // ---------- Text to speech ----------
 function pickVoice() {
   const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith(lang.slice(0, 2)));
@@ -199,7 +224,8 @@ async function sendTurn(text) {
     fillerSpoken = speak(f[Math.floor(Math.random() * f.length)]);
   }, 2500);
 
-  let reply;
+  let reply, point = null;
+  hideMarker();
   try {
     const res = await fetch("/api/turn", {
       method: "POST",
@@ -209,6 +235,7 @@ async function sendTurn(text) {
     const data = await res.json();
     sessionId = data.session_id;
     reply = data.reply;
+    point = data.point;
     if (data.error) console.warn("API error:", data.error);
   } catch (err) {
     console.error(err);
@@ -218,6 +245,7 @@ async function sendTurn(text) {
   if (fillerSpoken) await fillerSpoken;
 
   $("fixieSaid").textContent = reply;
+  showMarker(point);
   setState("speaking");
   await speak(reply);
   setState("idle");
