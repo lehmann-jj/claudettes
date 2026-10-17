@@ -1,47 +1,76 @@
-> 👋 **Starter for Claude Impact Lab teams.** Fill in each section below as you build and delete this note.
->
-> 📅 **Agenda, rules, deadline and judging** are in the event repo: **[claude-impact-lab-berlin-2026-10-17](https://github.com/Claude-Community-Berlin/claude-impact-lab-berlin-2026-10-17)**. Read it first.
->
-> ✅ **When you're finished:** record a 2-minute demo video, then submit with the **[submission form](https://tally.so/r/1WPr9Q)** before **16:00**. One submission per team.
->
-> 🔑 Set your API key first: `cp .env.example .env`, then paste your key into `.env` (it's git-ignored, never commit it).
+# Fixie · tech help on a video call
 
-# <Project name>
+**One line:** A video call with a patient AI helper who can *see* your broken printer through your phone camera and talk you through fixing it, like calling your grandchild.
 
-**One line:** <what it does, for whom>
-
-## The problem
-<Who has this problem, and why it matters. 2–3 sentences.>
+## Audience, problem, demo
+1. **Who:** Older adults (and anyone not confident with tech) who are stuck with a device at home: a printer, laptop, router or TV.
+2. **Their problem with AI today:** Chatbots expect you to type and to describe the problem in technical words. That's the hard part when you don't know what a "USB-C port" or "model number" is.
+3. **What our demo lets them do:** Press one green button, point the phone at the device and just talk. Claude watches the live video, finds the model, looks up the manual and guides them one step at a time, out loud.
 
 ## What it does
-<What a user can do with it. A short list is fine.>
+- Looks and feels like a normal video call: your camera fills the screen, the helper sits in a small tile.
+- **Live video:** the camera streams continuously. While you talk, the app keeps the last few seconds of frames and sends them with what you said, so Claude sees what you're pointing at, including movement.
+- **Voice in, voice out:** speech recognition and speech synthesis built into the browser. No typing needed. A text box is there as a backup.
+- **Looks things up:** once it knows the brand and model, Claude can search the web for the manual or known fixes.
+- Short, kind, one-step-at-a-time answers. Safety reminders (unplug first, go to a repair shop if it's risky).
+- English and German.
 
 ## How Claude is used
-<What Claude does inside the product: which model, what it reads, what it produces.>
+- **Model:** `claude-opus-5-5` with low effort for fast replies (change with `FIXIE_MODEL` in `.env`).
+- **Input:** what the caller said (speech-to-text) plus 3 recent JPEG frames from the live camera stream.
+- **Tools:** Anthropic's server-side **web search** to find manuals and fixes.
+- **Output:** 1 to 3 spoken sentences, read aloud by the browser.
+- The personality and rules are in [`prompts/system.md`](prompts/system.md). Edit that file to change how Fixie behaves.
 
 ## How to run it
 ```bash
-cp .env.example .env    # paste your ANTHROPIC_API_KEY into .env
-# then the commands to start it, e.g.
-# python app.py   or   npm install && npm run dev   or   open index.html
+cp .env.example .env              # paste your ANTHROPIC_API_KEY into .env
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn server:app --reload --host 0.0.0.0 --port 8000
+```
+Open **http://localhost:8000** in **Chrome** and press *Call Fixie*.
+
+**On an Android phone (the main way to use it):** browsers only allow the camera on `https://` (or localhost). Expose your laptop with a tunnel, then open the https link in Chrome on the phone:
+```bash
+npx localtunnel --port 8000        # or: cloudflared tunnel --url http://localhost:8000  /  ngrok http 8000
+```
+In Chrome's menu tap **Install app** (or *Add to Home screen*). Fixie then gets its own icon and opens full-screen like a normal calling app. The screen stays on during the call.
+
+*Why a web app and not native Kotlin?* With one day, an installable web app gives the same experience on Android (camera, mic, full-screen, home-screen icon) without an app store or build tools, and also runs on any laptop for judges.
+
+## How it works
+```
+ Browser (static/)                                       Server (server.py)            Claude
+ ┌─────────────────────────────────────────────┐
+ │ camera stream ──▶ frame buffer (1/sec)       │
+ │ mic ──▶ SpeechRecognition ──▶ pause 1.3 s ──┼──▶ POST /api/turn ──────────▶ messages API
+ │                         text + last 3 frames │      keeps the call history     (vision + web search)
+ │ speechSynthesis ◀── reply text ◀─────────────┼──◀──────────────────────────◀
+ └─────────────────────────────────────────────┘
 ```
 
-**Live link (if any):** <link>
+| File | What it is | Who usually edits it |
+|---|---|---|
+| `static/index.html`, `static/style.css` | The call screen | product / design |
+| `static/app.js` | Camera, voice, call loop | builder |
+| `server.py` | Talks to Claude | builder |
+| `prompts/system.md` | Fixie's personality and rules | domain expert, anyone |
+| `README.md` | This file | founder |
 
 ## Screenshots / demo
-<Drop screenshots here, or link your 2-minute demo video.>
+<Add a screenshot and the 2-minute demo video link here.>
 
 ## Team
-Teams of 5 (at least 1 builder, 1 product or design, 1 domain expert; plus founder or anyone). Link each name to a GitHub or LinkedIn profile, and replace the example row with your team.
-
 | Name | Role / background |
 |---|---|
-| [Mehul Patel](https://github.com/nomadicmehul) *(example)* | Claude Ambassador, DevRel |
-| [Your name](https://www.linkedin.com/in/your-profile) | Builder / Product or design / Domain expert / Founder |
-| [Your name](https://github.com/your-username) | |
-| [Your name](https://github.com/your-username) | |
-| [Your name](https://github.com/your-username) *(optional)* | |
+| [Your name](https://github.com/your-username) | Builder |
+| [Your name](https://github.com/your-username) | Product / design |
+| [Your name](https://github.com/your-username) | Domain expert |
+| [Your name](https://github.com/your-username) | Founder |
 | [Your name](https://github.com/your-username) *(optional)* | |
 
 ## Credits
-<Open-source libraries, APIs, datasets and assets you used.>
+- [Anthropic Claude API](https://docs.claude.com) (vision + web search)
+- [FastAPI](https://fastapi.tiangolo.com/), [Uvicorn](https://www.uvicorn.org/), [python-dotenv](https://github.com/theskumar/python-dotenv)
+- Browser Web Speech API (SpeechRecognition + speechSynthesis) and getUserMedia

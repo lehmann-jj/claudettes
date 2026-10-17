@@ -1,0 +1,15 @@
+{
+  "name": "Fixie · tech help on a video call",
+  "short_name": "Fixie",
+  "description": "Video-call a patient helper who can see your broken device and talk you through fixing it.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

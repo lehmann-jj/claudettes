@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Fixie · video call tech help</title>
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/static/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Lobby: shown before the call starts -->
+  <section id="lobby">
+    <div class="avatar big">F</div>
+    <h1>Fixie</h1>
+    <p>Your patient tech helper. Call, point your camera at the thing that's broken, and talk.</p>
+    <label>Language
+      <select id="lang">
+        <option value="en-US">English</option>
+        <option value="de-DE">Deutsch</option>
+      </select>
+    </label>
+    <button id="callBtn" class="green">📞 Call Fixie</button>
+    <p class="hint">Works best in Chrome. Allow camera and microphone when asked.</p>
+  </section>
+
+  <!-- The call -->
+  <section id="call" hidden>
+    <video id="cam" autoplay playsinline muted></video>
+
+    <header class="topbar">
+      <span class="dot"></span> Fixie · <span id="timer">00:00</span>
+    </header>
+
+    <div id="helperTile">
+      <div class="avatar" id="helperAvatar">F</div>
+      <div class="name">Fixie</div>
+      <div class="state" id="state">connecting…</div>
+    </div>
+
+    <div id="captions">
+      <div id="youSaid"></div>
+      <div id="fixieSaid"></div>
+    </div>
+
+    <form id="typeForm">
+      <input id="typeInput" placeholder="…or type here" autocomplete="off" />
+    </form>
+
+    <nav class="controls">
+      <button id="micBtn" title="Mute">🎤</button>
+      <button id="flipBtn" title="Switch camera">🔄</button>
+      <button id="hangBtn" class="red" title="Hang up">📞</button>
+    </nav>
+  </section>
+
+  <canvas id="grab" hidden></canvas>
+  <script src="/static/app.js"></script>
+</body>
+</html>
