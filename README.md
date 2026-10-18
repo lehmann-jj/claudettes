@@ -66,7 +66,7 @@ In Chrome's menu tap **Install app** (or *Add to Home screen*). Fixie then gets 
 ## Team
 | Name | Role / background |
 |---|---|
-| [Yuliia Ivanova](https://github.com/yuliiaivanova) | Domain expert |
+| [Yuliia Ivanova](https://github.com/juliaivanova) | Domain expert |
 | [Mariel Breuer](https://github.com/marielbreuer) | Product / design |
 | [Danial Darabi](https://github.com/drdanial97) | Builder |
 | [Eva-Valérie Gfrerer](https://de.linkedin.com/in/eva-gfrerer) | Founder |
